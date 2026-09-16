@@ -7,43 +7,51 @@
 //   SMTP_USER, SMTP_PASS, SMTP_FROM (defaults to SMTP_USER)
 
 const nodemailer = require('nodemailer');
+const net = require('net');
 
 let transporter = null;
-
-const dns = require('dns');
 
 function getTransporter() {
   if (transporter) return transporter;
   const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER) return null; // no SMTP configured → log mode
   transporter = nodemailer.createTransport({
-    // Use IPv4 explicitly. Some hosts (Render free tier) have no IPv6
-    // egress, and smtp.gmail.com often resolves to IPv6 first → ENETUNREACH.
+    // SMTP_HOST_V4 (if provided) forces a specific IPv4; otherwise the hostname
+    // is used. IPv4 preference is handled globally via dns.setDefaultResultOrder
+    // ('ipv4first') at boot — no hand-picked addresses needed for Gmail.
     host: (process.env.SMTP_HOST_V4 && process.env.SMTP_HOST_V4.trim()) || SMTP_HOST,
     port: Number(SMTP_PORT || 587),
     secure: SMTP_SECURE === 'true',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // Fail fast instead of hanging (nodemailer defaults are ~2 minutes).
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000
+    // Lenient timeouts — mail is sent fire-and-forget (sendEmailAsync), so the
+    // HTTP request never waits on these. Too-tight values cause false
+    // "Connection timeout" on slow cold-starts.
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000
   });
   return transporter;
 }
 
-// Resolve the SMTP host's IPv4 addresses once at boot, so a host with no
-// IPv6 egress (Render free tier) connects even when the hostname resolves
-// to IPv6 first. Falls back gracefully if the lookup fails.
-async function resolveSmtpHost(hostname) {
+// Boot-time connectivity probe: reports whether the SMTP host is reachable
+// over IPv4 on the common ports. Lets us see the real error (e.g. "port 465
+// blocked" vs "proxy refused") instead of guessing from a failed send.
+function probeSmtp(hostname = process.env.SMTP_HOST) {
   if (!hostname) return;
-  try {
-    const addrs = await dns.promises.resolve4(hostname);
-    if (addrs && addrs.length) {
-      process.env.SMTP_HOST_V4 = addrs[0];
-      console.log(`[mail] using IPv4 ${addrs[0]} for ${hostname} (SMTP egress is IPv4-only)`);
-    }
-  } catch (err) {
-    console.warn(`[mail] IPv4 lookup for ${hostname} failed (${err.code || err.message}); will use hostname as-is.`);
+  const configured = Number(process.env.SMTP_PORT || 587);
+  const ports = [...new Set([configured, 465, 587])].filter((p) => Number.isInteger(p) && p > 0);
+  for (const port of ports) {
+    const s = net.connect({ host: hostname, port, family: 4 });
+    const kill = setTimeout(() => s.destroy(), 8000);
+    s.on('connect', () => {
+      clearTimeout(kill);
+      console.log(`[mail] probe: ${hostname}:${port} REACHABLE (IPv4)`);
+      s.destroy();
+    });
+    s.on('error', (e) => {
+      clearTimeout(kill);
+      console.log(`[mail] probe: ${hostname}:${port} ${e.code || e.message}`);
+    });
   }
 }
 
@@ -80,4 +88,4 @@ function sendEmailAsync(payload) {
   );
 }
 
-module.exports = { sendEmail, sendEmailAsync, resolveSmtpHost };
+module.exports = { sendEmail, sendEmailAsync, probeSmtp };

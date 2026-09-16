@@ -11,11 +11,15 @@ const connectDB = require('./config/db');
 // Load env vars
 dotenv.config();
 
-// Resolve SMTP to an IPv4 address at boot (Render free tier has no IPv6
-// egress; smtp.gmail.com resolves to IPv6 first → ENETUNREACH otherwise).
-const { resolveSmtpHost } = require('./utils/sendEmail');
+// Prefer IPv4 for all connections. Render free tier has no IPv6 egress and
+// smtp.gmail.com resolves to IPv6 first → ENETUNREACH on every mail send.
+require('dns').setDefaultResultOrder('ipv4first');
+
+// Boot-time SMTP reachability probe (only when SMTP is configured). Logs
+// which ports are actually reachable so SMTP_PORT/SMTP_SECURE can be fixed.
+const { probeSmtp } = require('./utils/sendEmail');
 if (process.env.SMTP_HOST) {
-  resolveSmtpHost(process.env.SMTP_HOST);
+  probeSmtp(process.env.SMTP_HOST);
 }
 
 // ─── Startup validation ───────────────────────────────────────────
