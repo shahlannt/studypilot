@@ -19,7 +19,7 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     // Use IPv4 explicitly. Some hosts (Render free tier) have no IPv6
     // egress, and smtp.gmail.com often resolves to IPv6 first → ENETUNREACH.
-    host: (SMTP_HOST_V4 && SMTP_HOST_V4.trim()) || SMTP_HOST,
+    host: (process.env.SMTP_HOST_V4 && process.env.SMTP_HOST_V4.trim()) || SMTP_HOST,
     port: Number(SMTP_PORT || 587),
     secure: SMTP_SECURE === 'true',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
