@@ -19,6 +19,7 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Subjects from './pages/subjects/Subjects';
 import SubjectDetail from './pages/subjects/SubjectDetail';
 import Tasks from './pages/tasks/Tasks';
+import TaskDetail from './pages/tasks/TaskDetail';
 import CalendarPage from './pages/calendar/CalendarPage';
 import Notes from './pages/notes/Notes';
 import NoteEditor from './pages/notes/NoteEditor';
@@ -55,6 +56,7 @@ export default function App() {
       <Route path="/subjects" element={<Protected><Subjects /></Protected>} />
       <Route path="/subjects/:id" element={<Protected><SubjectDetail /></Protected>} />
       <Route path="/tasks" element={<Protected><Tasks /></Protected>} />
+      <Route path="/tasks/:id" element={<Protected><TaskDetail /></Protected>} />
       <Route path="/calendar" element={<Protected><CalendarPage /></Protected>} />
       <Route path="/notes" element={<Protected><Notes /></Protected>} />
       <Route path="/notes/new" element={<Protected><NoteEditor /></Protected>} />

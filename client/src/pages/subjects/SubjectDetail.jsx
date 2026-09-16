@@ -133,7 +133,7 @@ export default function SubjectDetail() {
                   <div key={t._id} className="flex items-center gap-3 px-4 py-3">
                     <Square className={`h-4 w-4 shrink-0 ${t.status === 'completed' ? 'text-emerald-500 fill-emerald-500' : 'text-slate-300 dark:text-slate-600'}`} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${t.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{t.title}</p>
+                      <Link to={`/tasks/${t._id}`} className={`text-sm hover:text-brand-600 dark:hover:text-brand-400 ${t.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{t.title}</Link>
                       <p className="text-xs text-slate-400">{t.status} · {t.priority}</p>
                     </div>
                     <span className="text-xs text-slate-400">{t.dueDate ? formatDate(t.dueDate) : 'No due date'}</span>

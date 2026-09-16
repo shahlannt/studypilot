@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { taskApi, subjectApi } from '../../services/api';
 import { useFetch, useDebounce } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Dropdown, DropdownItem } from '../../components/ui/Dropdown';
-import { Input, Textarea, Select } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Spinner } from '../../components/ui/LoadingSpinner';
 import { priorityBadge, statusBadge } from '../../components/ui/Badge';
@@ -15,6 +14,7 @@ import {
   ChevronDown, MoreVertical, Pencil, Trash2, CalendarDays, Clock, Tag
 } from 'lucide-react';
 import { formatRelative, formatDate, isOverdue, isToday } from '../../utils/format';
+import TaskModal from './TaskModal';
 
 const columns = [
   { key: 'todo', label: 'To do' },
@@ -231,9 +231,15 @@ function TaskCard({ task, onToggle, onEdit, onDelete }) {
           )}
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>
+          <Link
+            to={`/tasks/${task._id}`}
+            className={`text-sm font-medium hover:text-brand-600 dark:hover:text-brand-400 ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}
+          >
             {task.title}
-          </p>
+          </Link>
+          {task.description && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{task.description}</p>
+          )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
             <span className={`badge ${pb.color === 'red' ? 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' : pb.color === 'amber' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
               {pb.label}
@@ -270,135 +276,3 @@ function TaskCard({ task, onToggle, onEdit, onDelete }) {
   );
 }
 
-function TaskModal({ open, onClose, editing, subjects, defaultSubject, onSaved }) {
-  const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    title: '', description: '', subject: defaultSubject || '', priority: 'medium',
-    status: 'todo', dueDate: '', estimatedMinutes: 0, tags: ''
-  });
-  const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    if (open) {
-      if (editing) {
-        setForm({
-          title: editing.title,
-          description: editing.description || '',
-          subject: editing.subject?._id || '',
-          priority: editing.priority || 'medium',
-          status: editing.status,
-          dueDate: editing.dueDate ? new Date(editing.dueDate).toISOString().slice(0, 10) : '',
-          estimatedMinutes: editing.estimatedMinutes || 0,
-          tags: (editing.tags || []).join(', ')
-        });
-      } else {
-        setForm({
-          title: '', description: '', subject: defaultSubject || '', priority: 'medium',
-          status: 'todo', dueDate: '', estimatedMinutes: 0, tags: ''
-        });
-      }
-      setErrors({});
-    }
-  }, [open, editing, defaultSubject]);
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setErrors({ title: 'Title is required' }); return; }
-
-    setSaving(true);
-    try {
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        subject: form.subject || null,
-        priority: form.priority,
-        status: form.status,
-        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
-        estimatedMinutes: Number(form.estimatedMinutes) || 0,
-        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean)
-      };
-      if (editing) {
-        await taskApi.update(editing._id, payload);
-        toast.success('Task updated');
-      } else {
-        await taskApi.create(payload);
-        toast.success('Task created');
-      }
-      onSaved();
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit task' : 'New task'}>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <Input
-            label="Title *"
-            placeholder="e.g. Study for Network Security exam"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            error={errors.title}
-            autoFocus
-          />
-        </div>
-        <Textarea
-          label="Description"
-          placeholder="Notes, links, context…"
-          rows={3}
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <Select label="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
-            <option value="">No subject</option>
-            {subjects.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-          </Select>
-          <Select label="Priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-            <option value="todo">To do</option>
-            <option value="in-progress">In progress</option>
-            <option value="completed">Completed</option>
-          </Select>
-          <Input
-            label="Due date"
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Estimated time (minutes)"
-            type="number"
-            min="0"
-            placeholder="45"
-            value={form.estimatedMinutes}
-            onChange={(e) => setForm({ ...form, estimatedMinutes: e.target.value })}
-          />
-          <Input
-            label="Tags"
-            placeholder="exam, chapter-4 (comma separated)"
-            value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
-          />
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{editing ? 'Save changes' : 'Create task'}</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
