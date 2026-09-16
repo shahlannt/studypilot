@@ -158,8 +158,10 @@ function SubjectModal({ open, onClose, editing, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [color, setColor] = useState('#6366f1');
 
-  // Set values when editing opens
+  // Reset fresh (create) or pre-fill (edit) every time the modal opens.
+  // Without resetting on create, the form keeps the previous subject's values.
   useEffect(() => {
+    if (!open) return;
     if (editing) {
       reset({
         name: editing.name,
@@ -168,8 +170,11 @@ function SubjectModal({ open, onClose, editing, onSaved }) {
         color: editing.color
       });
       setColor(editing.color);
+    } else {
+      reset({ name: '', description: '', semester: '', color: '#6366f1' });
+      setColor('#6366f1');
     }
-  }, [editing, reset]);
+  }, [open, editing, reset]);
 
   const onSubmit = async (values) => {
     setSaving(true);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { subjectApi } from '../../services/api';
 import { useFetch } from '../../hooks/useFetch';
@@ -13,6 +13,8 @@ import {
   ArrowLeft, Pencil, Trash2, Plus, CheckSquare, StickyNote,
   Clock, GraduationCap, Target, BookOpen, Sparkles, Square
 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { Input, Textarea } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { excerpt, formatDate } from '../../utils/format';
 
@@ -24,6 +26,7 @@ export default function SubjectDetail() {
   const [tab, setTab] = useState('overview');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (loading) return <Spinner size="lg" />;
 
@@ -72,6 +75,9 @@ export default function SubjectDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-4 w-4" /> Edit
+          </Button>
           <Link to={`/quizzes?source=subject&id=${id}`} className="btn-secondary">
             <Sparkles className="h-4 w-4" /> Generate quiz
           </Link>
@@ -180,6 +186,13 @@ export default function SubjectDetail() {
           }}>Delete</Button>
         </div>
       </Modal>
+
+      <EditSubjectModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        subject={subject}
+        onSaved={() => { setEditOpen(false); refetch(); }}
+      />
     </div>
   );
 }
@@ -263,5 +276,68 @@ function QuizTab({ subjectId }) {
         onAction={() => navigate(`/quizzes?source=subject&id=${subjectId}`)}
       />
     </div>
+  );
+}
+
+const EDIT_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6'];
+
+function EditSubjectModal({ open, onClose, subject, onSaved }) {
+  const { toast } = useToast();
+  const { register, handleSubmit, reset } = useForm();
+  const [color, setColor] = useState(subject?.color || '#6366f1');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !subject) return;
+    reset({
+      name: subject.name,
+      description: subject.description || '',
+      semester: subject.semester || ''
+    });
+    setColor(subject.color || '#6366f1');
+  }, [open, subject, reset]);
+
+  const onSubmit = async (values) => {
+    setSaving(true);
+    try {
+      await subjectApi.update(subject._id, { ...values, color });
+      toast.success('Subject updated');
+      onSaved();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit subject">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input label="Name *" placeholder="e.g. Computer Networks" {...register('name', { required: 'Subject name is required' })} />
+        <Textarea label="Description" placeholder="What is this subject about?" rows={3} {...register('description')} />
+        <Input label="Semester / course" placeholder="e.g. Semester 4" {...register('semester')} />
+
+        <div>
+          <span className="label">Color</span>
+          <div className="flex flex-wrap gap-2">
+            {EDIT_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`h-8 w-8 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-brand-500 scale-110' : 'hover:scale-105'}`}
+                style={{ backgroundColor: c }}
+                aria-label={`Choose color ${c}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Save changes</Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
