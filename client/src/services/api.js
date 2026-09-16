@@ -3,9 +3,12 @@
 const API_URL = '/api';
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, extra = {}) {
     super(message);
     this.status = status;
+    // Preserve any extra fields the server sent (e.g. needsVerification on a
+    // 403) so consumers can branch on them.
+    Object.assign(this, extra);
   }
 }
 
@@ -47,7 +50,7 @@ export async function api(path, { method = 'GET', body, params } = {}) {
       localStorage.removeItem('sp_token');
       localStorage.removeItem('sp_user');
     }
-    throw new ApiError(res.status, data?.error || 'Something went wrong');
+    throw new ApiError(res.status, data?.error || 'Something went wrong', data || {});
   }
 
   return { status: res.status, data };
