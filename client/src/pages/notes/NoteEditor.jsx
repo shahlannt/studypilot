@@ -223,7 +223,9 @@ export default function NoteEditor() {
           size: file.size,
           data: base64
         });
-        setAttachments((prev) => [...prev, res.data.attachment]);
+        // Server returns metadata only — keep the base64 we already have so the
+        // thumbnail/download renders immediately instead of a broken link.
+        setAttachments((prev) => [...prev, { ...res.data.attachment, data: base64 }]);
         toast.success(`Attached ${file.name}`);
       } catch (err) {
         toast.error(err.message);
