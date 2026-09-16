@@ -40,6 +40,7 @@ export default function NoteEditor() {
   const [mode, setMode] = useState('write'); // write | preview
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(null);
 
   const { data: subjectsData } = useFetch(() => subjectApi.list());
   const subjects = subjectsData?.subjects || [];
@@ -212,6 +213,10 @@ export default function NoteEditor() {
         toast.error(`"${file.name}" is not supported. Upload images or PDFs.`);
         continue;
       }
+      if (attachments.some((a) => a.name === file.name && a.size === file.size)) {
+        toast.error(`"${file.name}" is already attached to this note`);
+        continue;
+      }
       try {
         setUploading(true);
         // Make sure the note exists before attaching
@@ -253,6 +258,31 @@ export default function NoteEditor() {
   };
 
   const attachmentUrl = (a) => `data:${a.type || 'application/octet-stream'};base64,${a.data}`;
+
+  // Reliable download: data: URLs above ~2 MB silently fail in most browsers,
+  // so decode the base64 to a Blob and drive the browser's downloader instead.
+  const downloadAttachment = (a) => {
+    if (!a?.data) {
+      toast.error('Attachment data is missing');
+      return;
+    }
+    try {
+      const bin = atob(a.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: a.type || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = a.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toast.error('Could not download this attachment');
+    }
+  };
 
   // Insert markdown at cursor
   const insertAtCursor = (before, after = '') => {
@@ -397,20 +427,22 @@ export default function NoteEditor() {
           </span>
           {attachments.map((a) => (
             <div key={a._id} className="group relative flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5">
-              {a.type?.startsWith('image/') ? (
-                <a href={attachmentUrl(a)} target="_blank" rel="noreferrer" title={`Open ${a.name}`} className="flex items-center gap-2">
-                  <img src={attachmentUrl(a)} alt={a.name} className="h-9 w-9 rounded object-cover" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
-                </a>
-              ) : (
-                <a href={attachmentUrl(a)} download={a.name} title={`Download ${a.name}`} className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-red-500 shrink-0" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
-                </a>
-              )}
-              <a href={attachmentUrl(a)} download={a.name} aria-label={`Download ${a.name}`} className="text-slate-300 hover:text-brand-500 dark:text-slate-500">
+              <button onClick={() => setPreview(a)} title={`View ${a.name}`} className="flex items-center gap-2 text-left">
+                {a.type?.startsWith('image/') ? (
+                  <>
+                    <img src={attachmentUrl(a)} alt={a.name} className="h-9 w-9 rounded object-cover" />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
+                  </>
+                )}
+              </button>
+              <button onClick={() => downloadAttachment(a)} aria-label={`Download ${a.name}`} title="Download" className="text-slate-300 hover:text-brand-500 dark:text-slate-500">
                 <Download className="h-3.5 w-3.5" />
-              </a>
+              </button>
               <button
                 onClick={() => handleRemoveAttachment(a._id, a.name)}
                 aria-label={`Remove ${a.name}`}
@@ -524,6 +556,21 @@ export default function NoteEditor() {
               <div className="mt-3"><Button size="sm" variant="secondary" onClick={() => navigate('/assistant')}>Open in Assistant</Button></div>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Attachment preview */}
+      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.name || 'Attachment'} size="xl">
+        {preview?.type?.startsWith('image/') ? (
+          <img src={attachmentUrl(preview)} alt={preview.name} className="max-h-[70vh] mx-auto rounded-lg" />
+        ) : (
+          <iframe src={attachmentUrl(preview)} title={preview?.name} className="w-full h-[70vh] rounded-lg" />
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button size="sm" variant="secondary" onClick={() => preview && downloadAttachment(preview)}>
+            <Download className="h-3.5 w-3.5" /> Download
+          </Button>
+          <Button size="sm" onClick={() => setPreview(null)}>Close</Button>
         </div>
       </Modal>
     </div>
