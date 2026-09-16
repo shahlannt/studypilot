@@ -283,7 +283,7 @@ const EDIT_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10
 
 function EditSubjectModal({ open, onClose, subject, onSaved }) {
   const { toast } = useToast();
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const [color, setColor] = useState(subject?.color || '#6366f1');
   const [saving, setSaving] = useState(false);
 
@@ -313,7 +313,7 @@ function EditSubjectModal({ open, onClose, subject, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title="Edit subject">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Input label="Name *" placeholder="e.g. Computer Networks" {...register('name', { required: 'Subject name is required' })} />
+        <Input label="Name *" placeholder="e.g. Computer Networks" error={errors.name?.message} {...register('name', { required: 'Subject name is required' })} />
         <Textarea label="Description" placeholder="What is this subject about?" rows={3} {...register('description')} />
         <Input label="Semester / course" placeholder="e.g. Semester 4" {...register('semester')} />
 

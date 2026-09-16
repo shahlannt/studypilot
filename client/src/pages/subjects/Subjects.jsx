@@ -66,7 +66,7 @@ export default function Subjects() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: `${s.color}1a` }}>
                     <BookOpen className="h-5 w-5" style={{ color: s.color }} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <Link to={`/subjects/${s._id}`} className="text-base font-semibold text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400">
                       {s.name}
                     </Link>
@@ -84,6 +84,10 @@ export default function Subjects() {
                   <DropdownItem icon={Trash2} danger onClick={() => { setDeleting(s); setConfirmOpen(true); }}>Delete</DropdownItem>
                 </Dropdown>
               </div>
+
+              {s.description && (
+                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{s.description}</p>
+              )}
 
               <div className="mt-4 flex-1">
                 <div className="flex items-center justify-between mb-1.5">
@@ -152,7 +156,7 @@ export default function Subjects() {
 
 function SubjectModal({ open, onClose, editing, onSaved }) {
   const { toast } = useToast();
-  const { register, handleSubmit, reset, setValue } = useForm({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: { name: '', description: '', semester: '', color: '#6366f1' }
   });
   const [saving, setSaving] = useState(false);
@@ -197,7 +201,7 @@ function SubjectModal({ open, onClose, editing, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit subject' : 'New subject'}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Input label="Name *" placeholder="e.g. Computer Networks" {...register('name', { required: 'Subject name is required' })} />
+        <Input label="Name *" placeholder="e.g. Computer Networks" error={errors.name?.message} {...register('name', { required: 'Subject name is required' })} />
         <Textarea label="Description" placeholder="What is this subject about?" rows={3} {...register('description')} />
         <Input label="Semester / course" placeholder="e.g. Semester 4" {...register('semester')} />
 
