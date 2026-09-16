@@ -199,7 +199,7 @@ export default function Dashboard() {
           </div>
 
           {/* AI Recommendation */}
-          <div className="rounded-xl border border-brand-200 dark:border-brand-900 bg-gradient-to-br from-brand-50 to-white dark:from-brand-950/50 dark:to-slate-900 p-5">
+          <div className="rounded-xl border border-brand-200 dark:border-slate-800 bg-gradient-to-br from-brand-50 to-white dark:bg-none dark:bg-slate-900 p-5">
             <div className="flex items-center gap-2 mb-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600">
                 <Sparkles className="h-4 w-4 text-white" />
