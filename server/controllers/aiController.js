@@ -101,7 +101,7 @@ const summarize = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Note not found' });
     }
 
-    if (!note.content || note.content.trim().length < 20) {
+    if (!note.content || note.content.trim().length < 10) {
       return res.status(400).json({
         success: false,
         error: 'Note is too short to summarize. Add more content first.'

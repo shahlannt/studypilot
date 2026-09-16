@@ -77,9 +77,12 @@ export default function NoteEditor() {
   // "already created" flag and cause a new note on every save.
   const saveTimer = useRef(null);
   const saveRef = useRef(null);
+  const isSaving = useRef(false);
   saveRef.current = { note, title, content, subject, favorite, tags };
 
   const doSave = useCallback(async (silent = true) => {
+    if (isSaving.current) return; // guard against concurrent saves (autosave + summarize)
+    isSaving.current = true;
     const s = saveRef.current;
     const payload = {
       title: s.title.trim() || 'Untitled note',
@@ -113,6 +116,7 @@ export default function NoteEditor() {
       if (!silent) toast.error(e.message);
     } finally {
       setSaving(false);
+      isSaving.current = false;
     }
   }, []);
 
@@ -145,7 +149,7 @@ export default function NoteEditor() {
   };
 
   const summarizeNow = async (text = content) => {
-    if (!text || text.trim().length < 20) {
+    if (!text || text.trim().length < 10) {
       setSummaryError('This note is too short to summarize. Add more content first.');
       return;
     }
