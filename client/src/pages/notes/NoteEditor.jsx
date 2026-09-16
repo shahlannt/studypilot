@@ -141,6 +141,10 @@ export default function NoteEditor() {
   // Trigger save on changes
   useEffect(() => {
     if (isNew && !content && !title) return;
+    // While loading an existing note, don't fire autosave — saveRef.current.note
+    // is still null and doSave would create a new blank note instead of waiting
+    // for the existing note to load.
+    if (!isNew && !note) return;
     setDirty(true);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => doSave(true), SAVE_DELAY);
