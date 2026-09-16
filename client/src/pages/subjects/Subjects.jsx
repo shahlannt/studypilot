@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { subjectApi } from '../../services/api';
 import { useFetch } from '../../hooks/useFetch';
@@ -159,7 +159,7 @@ function SubjectModal({ open, onClose, editing, onSaved }) {
   const [color, setColor] = useState('#6366f1');
 
   // Set values when editing opens
-  useState(() => {
+  useEffect(() => {
     if (editing) {
       reset({
         name: editing.name,
@@ -169,7 +169,7 @@ function SubjectModal({ open, onClose, editing, onSaved }) {
       });
       setColor(editing.color);
     }
-  });
+  }, [editing, reset]);
 
   const onSubmit = async (values) => {
     setSaving(true);
