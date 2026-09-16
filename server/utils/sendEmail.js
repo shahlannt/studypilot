@@ -42,7 +42,12 @@ function probeSmtp(hostname = process.env.SMTP_HOST) {
   const ports = [...new Set([configured, 465, 587])].filter((p) => Number.isInteger(p) && p > 0);
   for (const port of ports) {
     const s = net.connect({ host: hostname, port, family: 4 });
-    const kill = setTimeout(() => s.destroy(), 8000);
+    // If neither 'connect' nor 'error' fires within 8s, the SYN is being
+    // dropped silently — typical of Gmail blocking cloud/datacenter egress.
+    const kill = setTimeout(() => {
+      console.log(`[mail] probe: ${hostname}:${port} NO RESPONSE after 8s (SYN dropped / egress blocked — not a creds issue)`);
+      s.destroy();
+    }, 8000);
     s.on('connect', () => {
       clearTimeout(kill);
       console.log(`[mail] probe: ${hostname}:${port} REACHABLE (IPv4)`);
