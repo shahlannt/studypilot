@@ -3,11 +3,15 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// react-markdown strips data:-protocol URLs by default (XSS safety). Inline
-// images embedded in note content use data:image/* URLs, so allow those through
+// react-markdown strips non-standard URLs (data:, javascript:, …) by default for
+// XSS safety. Inline images are stored as compact `attachment:<id>` references
+// (resolved to a data: URL by the custom <img> component below), and legacy
+// notes may still hold `data:image/*` embedded directly — allow those two through
 // while keeping everything else (javascript:, data:text/html, …) blocked.
 const noteUrlTransform = (url) => {
-  if (String(url).startsWith('data:image/')) return url;
+  const u = String(url);
+  if (u.startsWith('attachment:')) return u;
+  if (u.startsWith('data:image/')) return u;
   return defaultUrlTransform(url);
 };
 import { noteApi, subjectApi, aiApi } from '../../services/api';
@@ -260,15 +264,10 @@ export default function NoteEditor() {
     reader.readAsDataURL(file);
   });
 
-  // Read a file as a full data:` URL (mime + base64) for inline embedding
-  const readAsDataURL = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Could not read file'));
-    reader.readAsDataURL(file);
-  });
-
   // ---- Inline images (embedded into the note content) ----
+  // Images are stored as real note attachments (so they persist inside the note
+  // doc in Mongo) and the content carries a short `attachment:<id>` reference.
+  // This keeps the markdown edit view compact instead of a wall of base64.
   const imageInputRef = useRef(null);
 
   const handleImageSelected = async (e) => {
@@ -284,18 +283,28 @@ export default function NoteEditor() {
       return;
     }
     try {
-      const dataUrl = await readAsDataURL(file);
-      // Embed the image as markdown so it shows inline in both the editor's
-      // preview mode and any rendered note. The data:` URL keeps the image
-      // self-contained in the note text (no dependency on attachments).
+      setUploading(true);
+      // Make sure the note exists before attaching
+      if (isNew || !saveRef.current.note) await doSave(true);
+      const base64 = await readAsBase64(file);
+      const res = await noteApi.addAttachment(saveRef.current.note._id, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: base64
+      });
+      // Keep the base64 so the thumbnail/render works immediately
+      const a = { ...res.data.attachment, data: base64 };
+      setAttachments((prev) => [...prev, a]);
+      const label = file.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ') || 'image';
       // Wrap in blank lines so the image sits on its own block, not glued to
       // surrounding text.
-      const label = file.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ') || 'image';
-      const md = `\n\n![${label}](${dataUrl})\n\n`;
-      insertAtCursor(md, '');
+      insertAtCursor(`\n\n![${label}](attachment:${a._id})\n\n`, '');
       toast.success('Image added to note');
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -577,7 +586,28 @@ export default function NoteEditor() {
           </div>
         ) : (
           <div className="p-5 min-h-[420px] markdown-body">
-            {content ? <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={noteUrlTransform}>{content}</ReactMarkdown> : <p className="text-slate-400">Nothing to preview yet.</p>}
+            {content ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                urlTransform={noteUrlTransform}
+                components={{
+                  img: ({ src, alt }) => {
+                    // Resolve compact attachment:<id> references to the stored image
+                    if (typeof src === 'string' && src.startsWith('attachment:')) {
+                      const a = attachments.find((x) => x._id === src.slice('attachment:'.length));
+                      if (a?.data) return <img src={attachmentUrl(a)} alt={alt || a.name || ''} />;
+                      // Image was removed — render nothing rather than a broken link
+                      return null;
+                    }
+                    return <img src={src} alt={alt || ''} />;
+                  }
+                }}
+              >
+                {content}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-slate-400">Nothing to preview yet.</p>
+            )}
           </div>
         )}
 
