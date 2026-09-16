@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+// react-markdown strips data:-protocol URLs by default (XSS safety). Inline
+// images embedded in note content use data:image/* URLs, so allow those through
+// while keeping everything else (javascript:, data:text/html, …) blocked.
+const noteUrlTransform = (url) => {
+  if (String(url).startsWith('data:image/')) return url;
+  return defaultUrlTransform(url);
+};
 import { noteApi, subjectApi, aiApi } from '../../services/api';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
@@ -78,47 +86,52 @@ export default function NoteEditor() {
   // "already created" flag and cause a new note on every save.
   const saveTimer = useRef(null);
   const saveRef = useRef(null);
-  const isSaving = useRef(false);
+  const saveChain = useRef(Promise.resolve());
   saveRef.current = { note, title, content, subject, favorite, tags };
 
+  // Serialized doSave: concurrent calls chain onto the previous one instead of
+  // running in parallel. This prevents a new note from being created twice
+  // (autosave + summarize/attach), while still letting the later call wait for
+  // the first to finish so `saveRef.current.note` is set before it runs.
   const doSave = useCallback(async (silent = true) => {
-    if (isSaving.current) return; // guard against concurrent saves (autosave + summarize)
-    isSaving.current = true;
-    const s = saveRef.current;
-    const payload = {
-      title: s.title.trim() || 'Untitled note',
-      content: s.content,
-      subject: s.subject || null,
-      favorite: s.favorite,
-      tags: s.tags.split(',').map((t) => t.trim()).filter(Boolean)
-    };
-    setSaving(true);
-    try {
-      if (!s.note) {
-        const res = await noteApi.create(payload);
-        setNote(res.data.note);
-        saveRef.current.note = res.data.note;
-        saveRef.current.isNew = false;
-        setLastSaved(res.data.note.updatedAt);
-        if (!silent) toast.success('Note created');
-        // Update URL silently if it was a new note
-        if (!window.location.pathname.includes(res.data.note._id)) {
-          window.history.replaceState(null, '', `/notes/${res.data.note._id}`);
+    const run = async () => {
+      const s = saveRef.current;
+      const payload = {
+        title: s.title.trim() || 'Untitled note',
+        content: s.content,
+        subject: s.subject || null,
+        favorite: s.favorite,
+        tags: s.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      };
+      setSaving(true);
+      try {
+        if (!s.note) {
+          const res = await noteApi.create(payload);
+          setNote(res.data.note);
+          saveRef.current.note = res.data.note;
+          saveRef.current.isNew = false;
+          setLastSaved(res.data.note.updatedAt);
+          if (!silent) toast.success('Note created');
+          // Update URL silently if it was a new note
+          if (!window.location.pathname.includes(res.data.note._id)) {
+            window.history.replaceState(null, '', `/notes/${res.data.note._id}`);
+          }
+        } else {
+          const res = await noteApi.update(s.note._id, payload);
+          setNote(res.data.note);
+          saveRef.current.note = res.data.note;
+          setLastSaved(res.data.note.updatedAt);
+          if (!silent) toast.success('Note saved');
         }
-      } else {
-        const res = await noteApi.update(s.note._id, payload);
-        setNote(res.data.note);
-        saveRef.current.note = res.data.note;
-        setLastSaved(res.data.note.updatedAt);
-        if (!silent) toast.success('Note saved');
+        setDirty(false);
+      } catch (e) {
+        if (!silent) toast.error(e.message);
+      } finally {
+        setSaving(false);
       }
-      setDirty(false);
-    } catch (e) {
-      if (!silent) toast.error(e.message);
-    } finally {
-      setSaving(false);
-      isSaving.current = false;
-    }
+    };
+    saveChain.current = saveChain.current.then(run, run);
+    return saveChain.current;
   }, []);
 
   // Trigger save on changes
@@ -247,6 +260,45 @@ export default function NoteEditor() {
     reader.readAsDataURL(file);
   });
 
+  // Read a file as a full data:` URL (mime + base64) for inline embedding
+  const readAsDataURL = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+
+  // ---- Inline images (embedded into the note content) ----
+  const imageInputRef = useRef(null);
+
+  const handleImageSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    if (file.size > MAX_FILE) {
+      toast.error(`"${file.name}" is too large (max 8 MB)`);
+      return;
+    }
+    try {
+      const dataUrl = await readAsDataURL(file);
+      // Embed the image as markdown so it shows inline in both the editor's
+      // preview mode and any rendered note. The data:` URL keeps the image
+      // self-contained in the note text (no dependency on attachments).
+      // Wrap in blank lines so the image sits on its own block, not glued to
+      // surrounding text.
+      const label = file.name.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ') || 'image';
+      const md = `\n\n![${label}](${dataUrl})\n\n`;
+      insertAtCursor(md, '');
+      toast.success('Image added to note');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleRemoveAttachment = async (attachId, name) => {
     try {
       await noteApi.removeAttachment(saveRef.current.note._id, attachId);
@@ -307,7 +359,8 @@ export default function NoteEditor() {
     { icon: Heading2, action: () => insertAtCursor('## ', ''), label: 'Heading' },
     { icon: List, action: () => insertAtCursor('\n- ', ''), label: 'Bullet list' },
     { icon: ListOrdered, action: () => insertAtCursor('\n1. ', ''), label: 'Numbered list' },
-    { icon: Code, action: () => insertAtCursor('`', '`'), label: 'Code' }
+    { icon: Code, action: () => insertAtCursor('`', '`'), label: 'Code' },
+    { icon: ImageIcon, action: () => imageInputRef.current?.click(), label: 'Insert image' }
   ];
 
   if (loading) return <Spinner size="lg" />;
@@ -404,6 +457,7 @@ export default function NoteEditor() {
           {lastSaved && <span className="text-xs text-slate-400 hidden sm:inline">Saved {saving ? '…' : timeAgo(lastSaved)}</span>}
           {dirty && <span className="text-xs text-slate-400">Unsaved</span>}
           <input ref={fileInputRef} type="file" accept="application/pdf,image/*" multiple className="hidden" onChange={handleFilesSelected} />
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelected} />
           <Button size="sm" variant="secondary" onClick={() => fileInputRef.current?.click()} loading={uploading} aria-label="Attach images or PDFs">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />} Attach
           </Button>
@@ -523,7 +577,7 @@ export default function NoteEditor() {
           </div>
         ) : (
           <div className="p-5 min-h-[420px] markdown-body">
-            {content ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown> : <p className="text-slate-400">Nothing to preview yet.</p>}
+            {content ? <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={noteUrlTransform}>{content}</ReactMarkdown> : <p className="text-slate-400">Nothing to preview yet.</p>}
           </div>
         )}
 
@@ -559,19 +613,23 @@ export default function NoteEditor() {
         </div>
       </Modal>
 
-      {/* Attachment preview */}
+      {/* Attachment preview — guard children so expressions only evaluate when preview is set */}
       <Modal open={!!preview} onClose={() => setPreview(null)} title={preview?.name || 'Attachment'} size="xl">
-        {preview?.type?.startsWith('image/') ? (
-          <img src={attachmentUrl(preview)} alt={preview.name} className="max-h-[70vh] mx-auto rounded-lg" />
-        ) : (
-          <iframe src={attachmentUrl(preview)} title={preview?.name} className="w-full h-[70vh] rounded-lg" />
+        {preview && (
+          <>
+            {preview.type?.startsWith('image/') ? (
+              <img src={attachmentUrl(preview)} alt={preview.name} className="max-h-[70vh] mx-auto rounded-lg" />
+            ) : (
+              <iframe src={attachmentUrl(preview)} title={preview.name} className="w-full h-[70vh] rounded-lg" />
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={() => downloadAttachment(preview)}>
+                <Download className="h-3.5 w-3.5" /> Download
+              </Button>
+              <Button size="sm" onClick={() => setPreview(null)}>Close</Button>
+            </div>
+          </>
         )}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button size="sm" variant="secondary" onClick={() => preview && downloadAttachment(preview)}>
-            <Download className="h-3.5 w-3.5" /> Download
-          </Button>
-          <Button size="sm" onClick={() => setPreview(null)}>Close</Button>
-        </div>
       </Modal>
     </div>
   );
