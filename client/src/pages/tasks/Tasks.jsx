@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Dropdown, DropdownItem } from '../../components/ui/Dropdown';
+import { Select } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Spinner } from '../../components/ui/LoadingSpinner';
 import { priorityBadge, statusBadge } from '../../components/ui/Badge';
