@@ -186,8 +186,11 @@ export default function NoteEditor() {
   };
 
   const summarizeNow = async (text = content) => {
-    if (!text || text.trim().length < 10) {
-      setSummaryError('This note is too short to summarize. Add more content first.');
+    // The server decides the real threshold — it can extract text from attached
+    // PDFs/images, which the client can't. Only block when there's literally
+    // nothing anywhere to work with.
+    if (!text?.trim() && attachments.length === 0) {
+      setSummaryError('This note has no text to summarize. Add text, a PDF, or an image with readable text.');
       return;
     }
     setSummarizing(true);
@@ -495,7 +498,7 @@ export default function NoteEditor() {
           <Button size="sm" variant="secondary" onClick={() => setAskOpen(true)} aria-label="Ask AI about this note">
             <MessageSquarePlus className="h-4 w-4" /> Ask AI
           </Button>
-          <Button size="sm" onClick={() => summarizeNow()}>
+          <Button size="sm" onClick={() => openSummary(content)}>
             <Sparkles className="h-4 w-4" /> Summarize
           </Button>
           <Button size="sm" variant="secondary" onClick={() => doSave(false)} disabled={!dirty}>

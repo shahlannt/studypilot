@@ -1,4 +1,5 @@
 const aiService = require('../services/ai');
+const { extractAttachmentsText } = require('../services/attachmentText');
 const Note = require('../models/Note');
 const Subject = require('../models/Subject');
 const Conversation = require('../models/Conversation');
@@ -101,14 +102,22 @@ const summarize = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Note not found' });
     }
 
-    if (!note.content || note.content.trim().length < 10) {
+    // A note's substance can live in attachments (PDFs/images) rather than the
+    // markdown body, so the "effective content" is the body plus whatever text
+    // can be extracted from attached files. Extraction never throws — unreadable
+    // files simply contribute nothing (see services/attachmentText.js).
+    const bodyText = (note.content || '').trim();
+    const attachmentText = await extractAttachmentsText(note);
+    const effective = [bodyText, attachmentText].filter(Boolean).join('\n\n');
+
+    if (effective.trim().length < 10) {
       return res.status(400).json({
         success: false,
-        error: 'Note is too short to summarize. Add more content first.'
+        error: 'This note has no text to summarize. Add text, a PDF, or an image with readable text.'
       });
     }
 
-    const summary = await aiService.summarize(note.content, length || req.user.settings?.ai?.summaryLength);
+    const summary = await aiService.summarize(effective, length || req.user.settings?.ai?.summaryLength);
 
     // Cache the summary on the note
     note.summary = { ...summary, length: length || 'medium', generatedAt: new Date() };

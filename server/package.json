@@ -18,7 +18,9 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.6.0",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^6.0.0"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.2.0",
