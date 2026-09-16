@@ -1,81 +1,75 @@
-// Mail courier: real SMTP delivery when configured, otherwise a readable
-// console fallback so the app (and the verification/reset flows) remain
-// testable without any mail credentials.
+// Email courier: sends transactional email via the Brevo (Sendinblue) API
+// over HTTPS. Brevo is reachable from any host — including Render's cloud
+// egress, where direct SMTP to smtp.gmail.com is silently dropped by Google.
+// Falls back to printing the email to the server log when no BREVO_API_KEY is
+// configured, so the verification/reset flows stay testable without creds.
 //
-// Configure via these env vars (all optional):
-//   SMTP_HOST, SMTP_PORT (default 587), SMTP_SECURE ('true' for 465),
-//   SMTP_USER, SMTP_PASS, SMTP_FROM (defaults to SMTP_USER)
+// Env vars:
+//   BREVO_API_KEY — required to send. Create a free account (300 emails/day),
+//                   add a sender, and paste the master/tx API key here.
+//   EMAIL_FROM    — e.g. "StudyPilot <shahlann522@gmail.com>". Must be a
+//                   sender verified in the Brevo account. Defaults to
+//                   SMTP_FROM / SMTP_USER (kept for the already-configured
+//                   SMTP values) and finally to a plain fallback.
 
-const nodemailer = require('nodemailer');
-const net = require('net');
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
-let transporter = null;
+const getApiKey = () => (process.env.BREVO_API_KEY || '').trim();
 
-function getTransporter() {
-  if (transporter) return transporter;
-  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_USER) return null; // no SMTP configured → log mode
-  transporter = nodemailer.createTransport({
-    // SMTP_HOST_V4 (if provided) forces a specific IPv4; otherwise the hostname
-    // is used. IPv4 preference is handled globally via dns.setDefaultResultOrder
-    // ('ipv4first') at boot — no hand-picked addresses needed for Gmail.
-    host: (process.env.SMTP_HOST_V4 && process.env.SMTP_HOST_V4.trim()) || SMTP_HOST,
-    port: Number(SMTP_PORT || 587),
-    secure: SMTP_SECURE === 'true',
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // Lenient timeouts — mail is sent fire-and-forget (sendEmailAsync), so the
-    // HTTP request never waits on these. Too-tight values cause false
-    // "Connection timeout" on slow cold-starts.
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000
-  });
-  return transporter;
-}
+const getFrom = () =>
+  (
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_FROM ||
+    (process.env.SMTP_USER ? `StudyPilot <${process.env.SMTP_USER}>` : '')
+  ).trim();
 
-// Boot-time connectivity probe: reports whether the SMTP host is reachable
-// over IPv4 on the common ports. Lets us see the real error (e.g. "port 465
-// blocked" vs "proxy refused") instead of guessing from a failed send.
-function probeSmtp(hostname = process.env.SMTP_HOST) {
-  if (!hostname) return;
-  const configured = Number(process.env.SMTP_PORT || 587);
-  const ports = [...new Set([configured, 465, 587])].filter((p) => Number.isInteger(p) && p > 0);
-  for (const port of ports) {
-    const s = net.connect({ host: hostname, port, family: 4 });
-    // If neither 'connect' nor 'error' fires within 8s, the SYN is being
-    // dropped silently — typical of Gmail blocking cloud/datacenter egress.
-    const kill = setTimeout(() => {
-      console.log(`[mail] probe: ${hostname}:${port} NO RESPONSE after 8s (SYN dropped / egress blocked — not a creds issue)`);
-      s.destroy();
-    }, 8000);
-    s.on('connect', () => {
-      clearTimeout(kill);
-      console.log(`[mail] probe: ${hostname}:${port} REACHABLE (IPv4)`);
-      s.destroy();
-    });
-    s.on('error', (e) => {
-      clearTimeout(kill);
-      console.log(`[mail] probe: ${hostname}:${port} ${e.code || e.message}`);
-    });
-  }
+// One-line description of the active backend, printed at boot.
+function emailBackendName() {
+  if (getApiKey()) return `Brevo API (from: ${getFrom() || '<unset — add EMAIL_FROM>'})`;
+  return 'log mode (no BREVO_API_KEY — emails printed to the server log)';
 }
 
 async function sendEmail({ to, subject, text, html }) {
-  const t = getTransporter();
-  if (t) {
-    await t.sendMail({
-      from: process.env.SMTP_FROM || `StudyPilot <${process.env.SMTP_USER}>`,
-      to,
-      subject,
-      text,
-      html
+  const apiKey = getApiKey();
+  if (apiKey) {
+    const from = getFrom();
+    if (!from) {
+      throw new Error(
+        'No from address — set EMAIL_FROM to a sender verified in your Brevo account ' +
+          '(e.g. "StudyPilot <you@example.com>")'
+      );
+    }
+    const m = from.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/);
+    const sender = m
+      ? { name: m[1] || 'StudyPilot', email: m[2] }
+      : { name: 'StudyPilot', email: from };
+
+    const res = await fetch(BREVO_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+        textContent: text
+      })
     });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Brevo HTTP ${res.status}: ${errBody.slice(0, 300)}`);
+    }
     return;
   }
 
-  // Dev / no-SMTP fallback: print the email to the server log so the flow
+  // Dev / no-key fallback: print the email to the server log so the flow
   // can be tested end-to-end. The console link is clickable in most terminals.
-  console.log('\n────────── [STUDYPILOT MAIL (no SMTP — printed to log)] ──────────');
+  console.log('\n────────── [STUDYPILOT MAIL (log mode — no BREVO_API_KEY)] ──────────');
   console.log(`To:      ${to}`);
   console.log(`Subject: ${subject}`);
   console.log('────────────────────────────────────────────────────────────');
@@ -84,7 +78,7 @@ async function sendEmail({ to, subject, text, html }) {
 }
 
 // Fire-and-forget delivery helper: sends in the background so an HTTP request
-// NEVER blocks on the mail server (a slow/unreachable SMTP must not make
+// NEVER blocks on the mail service (slow/unreachable mail must not make
 // register or forgot-password hang). Outcomes are logged server-side.
 function sendEmailAsync(payload) {
   sendEmail(payload).then(
@@ -93,4 +87,4 @@ function sendEmailAsync(payload) {
   );
 }
 
-module.exports = { sendEmail, sendEmailAsync, probeSmtp };
+module.exports = { sendEmail, sendEmailAsync, emailBackendName };

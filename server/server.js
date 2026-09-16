@@ -15,12 +15,11 @@ dotenv.config();
 // smtp.gmail.com resolves to IPv6 first → ENETUNREACH on every mail send.
 require('dns').setDefaultResultOrder('ipv4first');
 
-// Boot-time SMTP reachability probe (only when SMTP is configured). Logs
-// which ports are actually reachable so SMTP_PORT/SMTP_SECURE can be fixed.
-const { probeSmtp } = require('./utils/sendEmail');
-if (process.env.SMTP_HOST) {
-  probeSmtp(process.env.SMTP_HOST);
-}
+// Boot-time email backend check. Direct SMTP to smtp.gmail.com is silently
+// dropped from Render's cloud egress, so mail goes through the Brevo API
+// (HTTPS) when BREVO_API_KEY is set; otherwise it prints to the server log.
+const { emailBackendName } = require('./utils/sendEmail');
+console.log(`[mail] backend: ${emailBackendName()}`);
 
 // ─── Startup validation ───────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {

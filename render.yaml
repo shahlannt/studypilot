@@ -37,8 +37,15 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
-      # Email (verification + password reset). Without these, emails are
-      # printed to the server log instead of sent, so registration still works.
+      # Email (verification + password reset). Email is sent via the Brevo API
+      # (HTTPS). Get a free key at https://www.brevo.com, add the sender you
+      # want as From (e.g. your gmail), and set EMAIL_FROM to that address.
+      # SMTP_* below are legacy/ignored — direct Gmail SMTP is blocked from
+      # Render's cloud egress.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
