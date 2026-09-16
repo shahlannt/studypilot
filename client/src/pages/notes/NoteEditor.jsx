@@ -53,6 +53,7 @@ export default function NoteEditor() {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
 
   const { data: subjectsData } = useFetch(() => subjectApi.list());
   const subjects = subjectsData?.subjects || [];
@@ -150,6 +151,20 @@ export default function NoteEditor() {
     saveTimer.current = setTimeout(() => doSave(true), SAVE_DELAY);
     return () => clearTimeout(saveTimer.current);
   }, [title, content, subject, favorite, tags]);
+
+  // Attachment preview must use a blob URL, not the data URL — Chrome refuses to
+  // load `data:` URLs inside <iframe> (PDFs and other documents show a "Failed to
+  // load PDF document" error). Create a blob URL when a preview is opened and
+  // revoke it once the modal closes so we don't leak object URLs.
+  useEffect(() => {
+    if (!preview?.data) {
+      setPreviewBlobUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(base64ToBlob(preview.data, preview.type));
+    setPreviewBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [preview]);
 
   // ---- AI Summary ----
   const [summary, setSummary] = useState(null);
@@ -324,6 +339,13 @@ export default function NoteEditor() {
 
   const attachmentUrl = (a) => `data:${a.type || 'application/octet-stream'};base64,${a.data}`;
 
+  const base64ToBlob = (b64, type = 'application/octet-stream') => {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type });
+  };
+
   // Reliable download: data: URLs above ~2 MB silently fail in most browsers,
   // so decode the base64 to a Blob and drive the browser's downloader instead.
   const downloadAttachment = (a) => {
@@ -332,11 +354,7 @@ export default function NoteEditor() {
       return;
     }
     try {
-      const bin = atob(a.data);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const blob = new Blob([bytes], { type: a.type || 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(base64ToBlob(a.data, a.type));
       const link = document.createElement('a');
       link.href = url;
       link.download = a.name;
@@ -652,9 +670,9 @@ export default function NoteEditor() {
         {preview && (
           <>
             {preview.type?.startsWith('image/') ? (
-              <img src={attachmentUrl(preview)} alt={preview.name} className="max-h-[70vh] mx-auto rounded-lg" />
+              <img src={previewBlobUrl || attachmentUrl(preview)} alt={preview.name} className="max-h-[70vh] mx-auto rounded-lg" />
             ) : (
-              <iframe src={attachmentUrl(preview)} title={preview.name} className="w-full h-[70vh] rounded-lg" />
+              <iframe src={previewBlobUrl} title={preview.name} className="w-full h-[70vh] rounded-lg" />
             )}
             <div className="mt-4 flex justify-end gap-2">
               <Button size="sm" variant="secondary" onClick={() => downloadAttachment(preview)}>
