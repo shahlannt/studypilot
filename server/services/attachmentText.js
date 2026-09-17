@@ -27,19 +27,24 @@ const getPdfjs = () => {
 
 // Extract the text layer of a PDF buffer, one line per page.
 async function extractPdfText(buf) {
-  const pdfjs = await getPdfjs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
   try {
-    const parts = [];
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const tc = await page.getTextContent();
-      parts.push(tc.items.map((it) => it.str).join(' '));
-      page.cleanup && page.cleanup();
+    const pdfjs = await getPdfjs();
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+    try {
+      const parts = [];
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i);
+        const tc = await page.getTextContent();
+        parts.push(tc.items.map((it) => it.str).join(' '));
+        page.cleanup && page.cleanup();
+      }
+      return parts.join('\n');
+    } finally {
+      await doc.destroy();
     }
-    return parts.join('\n');
-  } finally {
-    await doc.destroy();
+  } catch (err) {
+    console.warn(`[attachmentText] PDF extraction failed: ${err}`);
+    return '';
   }
 }
 
@@ -64,9 +69,14 @@ const getOcrWorker = () => {
 };
 
 async function ocrImage(buf) {
-  const worker = await getOcrWorker();
-  const { data } = await worker.recognize(new Uint8Array(buf));
-  return (data && data.text) || '';
+  try {
+    const worker = await getOcrWorker();
+    const { data } = await worker.recognize(new Uint8Array(buf));
+    return (data && data.text) || '';
+  } catch (err) {
+    console.warn(`[attachmentText] OCR recognition failed: ${err}`);
+    return '';
+  }
 }
 
 const isPdf = (a) => a.type === 'application/pdf' || /\.pdf$/i.test(a.name || '');
