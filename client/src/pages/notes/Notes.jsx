@@ -109,7 +109,7 @@ export default function Notes() {
                   {n.favorite ? <Star className="h-4 w-4 text-amber-400 fill-amber-400" /> : <StarOff className="h-4 w-4" />}
                 </button>
                 <Dropdown
-                  trigger={<span className="text-slate-400 opacity-0 group-hover:opacity-100 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" role="button" aria-label="Note options"><MoreVertical className="h-4 w-4" /></span>}
+                  trigger={<span className="text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" role="button" aria-label="Note options"><MoreVertical className="h-4 w-4" /></span>}
                 >
                   <DropdownItem icon={Pencil} onClick={() => navigate(`/notes/${n._id}`)}>Edit</DropdownItem>
                   <DropdownItem icon={Sparkles} onClick={() => navigate(`/notes/${n._id}?summarize=1`)}>Summarize</DropdownItem>
