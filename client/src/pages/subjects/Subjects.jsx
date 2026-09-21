@@ -75,8 +75,8 @@ export default function Subjects() {
                 </div>
                 <Dropdown
                   trigger={
-                    <span className="text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-white p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" role="button" aria-label="Subject options">
-                      <MoreVertical className="h-4 w-4" />
+                    <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-xs font-medium transition-colors" role="button" aria-label="Subject options">
+                      <MoreVertical className="h-3.5 w-3.5" />
                     </span>
                   }
                 >
