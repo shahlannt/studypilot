@@ -95,7 +95,7 @@ export function Header({ onMenuClick }) {
         align="right"
         width="w-80"
         trigger={
-          <span className="relative p-2 rounded-lg inline-flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800" role="button" aria-label="Notifications">
+          <span className="relative p-2 rounded-lg inline-flex items-center justify-center text-slate-400 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100" role="button" aria-label="Notifications">
             <Bell className="h-5 w-5" />
             {unread > 0 && (
               <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
