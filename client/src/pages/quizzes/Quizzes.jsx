@@ -333,6 +333,7 @@ function QuizPlayer({ quiz, onClose }) {
       setSaving(false);
     }
     window.scrollTo(0, 0);
+    setStep('results');
   };
 
   if (step === 'intro') {
