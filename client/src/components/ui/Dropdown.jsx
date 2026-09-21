@@ -44,7 +44,7 @@ export function DropdownItem({ icon: Icon, children, onClick, danger = false }) 
       onClick={() => {
         onClick?.();
       }}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700 ${
         danger ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'
       }`}
       role="menuitem"
