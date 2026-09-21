@@ -39,7 +39,7 @@ export function Select({ label, error, id, children, ...props }) {
   return (
     <div>
       {label && <label htmlFor={inputId} className="label">{label}</label>}
-      <select id={inputId} className={`input bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 ${props.className || ''}`} {...props}>
+      <select id={inputId} className={`input appearance-none cursor-pointer bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 ${props.className || ''}`} {...props}>
         {children}
       </select>
       {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
