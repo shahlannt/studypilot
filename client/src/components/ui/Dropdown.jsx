@@ -29,7 +29,7 @@ export function Dropdown({ trigger, children, align = 'right', width = 'w-48' })
       </button>
       {open && (
         <div
-          className={`absolute z-30 mt-2 ${alignClass} ${width} rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-cardHover py-1 animate-fade-in`}
+          className={`absolute z-30 mt-2 ${alignClass} ${width} rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-cardHover py-1 animate-fade-in`}
         >
           {children}
         </div>

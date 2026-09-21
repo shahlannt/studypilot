@@ -167,6 +167,33 @@ Return ONLY valid JSON:
       throw new Error('AI returned invalid JSON response');
     }
   }
+
+  /**
+   * Cleans up Mermaid code string by removing markdown code fences and trimming.
+   * @param {string|null} code - Raw Mermaid code string from AI
+   * @returns {string|null} Cleaned Mermaid code or null if empty/invalid
+   */
+  cleanMermaidCode(code) {
+    if (typeof code !== 'string') return null;
+    // Trim whitespace
+    code = code.trim();
+    // Remove starting and ending triple backticks if present
+    if (code.startsWith('```') && code.endsWith('```')) {
+      // Extract the content between the backticks, but note there might be a language specifier after the first ```
+      const lines = code.split('\n');
+      // Remove the first line if it starts with ```
+      if (lines[0].trim().startsWith('```')) {
+        lines.shift();
+      }
+      // Remove the last line if it ends with ```
+      if (lines.length > 0 && lines[lines.length-1].trim().endsWith('```')) {
+        lines.pop();
+      }
+      code = lines.join('\n').trim();
+    }
+    // If the code is empty, return null
+    return code.length > 0 ? code : null;
+  }
 }
 
 module.exports = new AIService();

@@ -403,7 +403,7 @@ export default function NoteEditor() {
     <div className="space-y-4 animate-slide-up">
       {/* AI Summary panel */}
       {summaryOpen && (
-        <div className="rounded-xl border border-brand-200 dark:border-brand-900 bg-gradient-to-br from-brand-50 to-white dark:from-brand-950/50 dark:to-slate-900 p-5 animate-slide-up">
+        <div className="rounded-xl border border-brand-200 dark:border-brand-800 bg-gradient-to-br from-brand-50 to-white dark:bg-slate-900 dark:from-brand-950/60 dark:to-slate-950 p-5 animate-slide-up">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-brand-600 dark:text-brand-400" />

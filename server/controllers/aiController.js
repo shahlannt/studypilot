@@ -107,7 +107,14 @@ const summarize = async (req, res, next) => {
     // can be extracted from attached files. Extraction never throws — unreadable
     // files simply contribute nothing (see services/attachmentText.js).
     const bodyText = (note.content || '').trim();
-    const attachmentText = await extractAttachmentsText(note);
+    let attachmentText = '';
+    try {
+      attachmentText = await extractAttachmentsText(note);
+    } catch (extractError) {
+      console.error('[aiController] Error extracting text from attachments:', extractError);
+      // Continue with just the body text if extraction fails
+      attachmentText = '';
+    }
     const effective = [bodyText, attachmentText].filter(Boolean).join('\n\n');
 
     if (effective.trim().length < 10) {
@@ -117,7 +124,13 @@ const summarize = async (req, res, next) => {
       });
     }
 
-    const summary = await aiService.summarize(effective, length || req.user.settings?.ai?.summaryLength);
+    let summary;
+    try {
+      summary = await aiService.summarize(effective, length || req.user.settings?.ai?.summaryLength);
+    } catch (summarizeError) {
+      console.error('[aiController] Error generating summary:', summarizeError);
+      throw summarizeError; // Re-throw to be caught by the outer try/catch
+    }
 
     // Cache the summary on the note
     note.summary = { ...summary, length: length || 'medium', generatedAt: new Date() };
@@ -125,6 +138,7 @@ const summarize = async (req, res, next) => {
 
     res.json({ success: true, summary });
   } catch (error) {
+    console.error('[aiController] Summarize error:', error);
     next(error);
   }
 };
