@@ -70,7 +70,7 @@ const createTask = async (req, res, next) => {
       subject: req.body.subject || null,
       priority: req.body.priority || 'medium',
       status: req.body.status || 'todo',
-      dueDate: req.body.dueDate || null,
+      dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       estimatedMinutes: req.body.estimatedMinutes || 0,
       tags: req.body.tags || []
     });
