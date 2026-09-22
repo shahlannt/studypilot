@@ -24,6 +24,8 @@ export default function Dashboard() {
   const [generating, setGenerating] = useState(false);
 
   const stats = data?.stats;
+  const todayFocusData = data?.todayFocus || stats?.todayFocus || [];
+  const upcomingDeadlinesData = data?.upcomingDeadlines || stats?.upcomingDeadlines || [];
 
   const loadRecommendations = useCallback(async () => {
     setAiLoading(true);
@@ -87,12 +89,12 @@ export default function Dashboard() {
                 All tasks <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
-            {(stats?.todayFocus || []).length === 0 ? (
+            {(todayFocusData || []).length === 0 ? (
               <EmptyState icon={Circle} title="No tasks for today" description="Enjoy the breather, or plan your next task."
                 actionLabel="Add a task" onAction={() => navigate('/tasks?new=1')} />
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                {stats.todayFocus.map((t) => {
+                {todayFocusData.map((t) => {
                   const pb = priorityBadge(t.priority);
                   const num = { urgent: 4, high: 3, medium: 2, low: 1 }[t.priority];
                   return (
@@ -176,11 +178,11 @@ export default function Dashboard() {
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Upcoming deadlines</h2>
               <CalendarClock className="h-4 w-4 text-slate-400" />
             </div>
-            {(stats?.upcomingDeadlines || []).length === 0 ? (
+            {(upcomingDeadlinesData || []).length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">Nothing due soon</p>
             ) : (
               <ul className="space-y-2">
-                {stats.upcomingDeadlines.map((t) => (
+                {upcomingDeadlinesData.map((t) => (
                   <li key={t._id} className="flex items-center gap-3">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${isOverdue(t.dueDate) ? 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400' : isToday(t.dueDate) ? 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
                       {new Date(t.dueDate).getDate()}
