@@ -47,7 +47,7 @@
 | Frontend | React 18, Vite, React Router v6, Tailwind CSS 3, Recharts, React Hook Form |
 | Backend | Node.js, Express, Mongoose, JWT, bcryptjs |
 | Database | MongoDB (Atlas or local) |
-| AI | OpenAI-compatible API via swappable provider abstraction |
+| AI | Grok-compatible API via swappable provider abstraction |
 | Icons | Lucide React |
 
 ---
@@ -113,7 +113,7 @@ MONGODB_URI=mongodb://localhost:27017/studypilot
 JWT_SECRET=your-random-secret-here
 JWT_EXPIRE=7d
 AI_API_KEY=sk-your-openai-key
-AI_PROVIDER=openai
+AI_PROVIDER=Grok
 CLIENT_URL=http://localhost:5173
 ```
 
