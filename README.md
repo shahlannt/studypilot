@@ -47,7 +47,7 @@
 | Frontend | React 18, Vite, React Router v6, Tailwind CSS 3, Recharts, React Hook Form |
 | Backend | Node.js, Express, Mongoose, JWT, bcryptjs |
 | Database | MongoDB (Atlas or local) |
-| AI | Grok-compatible API via swappable provider abstraction |
+| AI | OpenAi-compatible API via swappable provider abstraction |
 | Icons | Lucide React |
 
 ---
